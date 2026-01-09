@@ -190,20 +190,20 @@ export const SocialMedia = (): JSX.Element => {
                 )}
               </div>
             ))}
-
-            {/* Download button */}
-            {uploadedMedia && (
-              <Button
-                onClick={handleDownload}
-                className="w-full mt-4 md:mt-8 h-[50px] md:h-[60px] bg-[#ee0b48] hover:bg-[#ee0b48]/90 text-white rounded-[150px] flex items-center justify-center gap-3"
-              >
-                <Download className="w-5 h-5 md:w-6 md:h-6" />
-                <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
-                  Download Your Invite
-                </span>
-              </Button>
-            )}
           </nav>
+
+          {/* Download button - visible on all screen sizes */}
+          {uploadedMedia && (
+            <Button
+              onClick={handleDownload}
+              className="w-full max-w-[361px] mt-4 md:mt-8 h-[50px] md:h-[60px] bg-[#ee0b48] hover:bg-[#ee0b48]/90 text-white rounded-[150px] flex items-center justify-center gap-3"
+            >
+              <Download className="w-5 h-5 md:w-6 md:h-6" />
+              <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
+                Download Your Invite
+              </span>
+            </Button>
+          )}
         </div>
 
         {/* Right side - Visible card with border and button */}
