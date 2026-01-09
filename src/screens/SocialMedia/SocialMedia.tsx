@@ -196,7 +196,7 @@ export const SocialMedia = (): JSX.Element => {
           {uploadedMedia && (
             <Button
               onClick={handleDownload}
-              className="w-full max-w-[361px] mt-4 md:mt-8 h-[50px] md:h-[60px] bg-[#ee0b48] hover:bg-[#ee0b48]/90 text-white rounded-[150px] flex items-center justify-center gap-3"
+              className="fixed bottom-4 left-4 right-4 lg:relative lg:bottom-auto lg:left-auto lg:right-auto w-auto max-w-[361px] mx-auto lg:w-full mt-0 lg:mt-8 h-[50px] md:h-[60px] bg-[#ee0b48] hover:bg-[#ee0b48]/90 text-white rounded-[150px] flex items-center justify-center gap-3 z-50"
             >
               <Download className="w-5 h-5 md:w-6 md:h-6" />
               <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
@@ -281,9 +281,8 @@ export const SocialMedia = (): JSX.Element => {
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[45px] items-center justify-center gap-2.5 px-4 relative w-full max-w-full bg-white rounded-[150px] hover:bg-white/90 z-10"
+                  className="flex h-[45px] items-center justify-center px-4 relative w-full max-w-full bg-white rounded-[150px] hover:bg-white/90 z-10"
                 >
-                  <Upload className="w-4 h-4" />
                   <span className="[font-family:'Roboto',Helvetica] font-black text-black text-sm">
                     {uploadedMedia ? "Change media" : "Add picture or video"}
                   </span>
