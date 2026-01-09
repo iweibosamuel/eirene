@@ -145,7 +145,7 @@ export const SocialMedia = (): JSX.Element => {
       <div className="top-[-1321px] left-[-115px] w-[1832px] h-[1833px] bg-[#ee0b48] rounded-[916px/916.5px] absolute blur-[127px] z-0" />
 
       {/* Content Container */}
-      <div className="relative w-full max-w-[1400px] h-auto lg:h-full lg:max-h-screen flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-between gap-6 lg:gap-8 py-4 lg:py-0 z-10">
+      <div className="relative w-full max-w-[1400px] h-auto lg:h-full lg:max-h-screen flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-between gap-6 lg:gap-8 py-4 lg:py-0 pb-24 lg:pb-0 z-10">
         {/* Left side - Title and Steps */}
         <div className="flex flex-col gap-4 md:gap-6 lg:gap-4 flex-shrink-0 relative z-10 w-full lg:w-auto items-center lg:items-start">
           <header className="flex gap-[3.5px] items-center relative z-10 justify-center lg:justify-start">
