@@ -1,9 +1,8 @@
 import { Button } from "../../components/ui/button";
 import { CardContent } from "../../components/ui/card";
 import { useRef, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Download } from "lucide-react";
 import ReactCrop, { Crop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
 
 const steps = [
   {
@@ -325,16 +324,12 @@ export const SocialMedia = (): JSX.Element => {
           }}
         >
         <CardContent className="inline-flex flex-col items-center justify-center gap-[15.97px] p-0 relative w-full z-10" data-card-content>
-          <header className="flex items-center gap-1 z-10" data-header>
+          <header className="flex items-center justify-center gap-1 z-10" data-header>
             <img
-              className="w-[43.04px] h-[43.04px] z-10 brightness-0 invert"
-              alt="Layer"
-              src="/layer-1.svg"
+              className="w-[60%] h-auto z-10"
+              alt="Open Heavens Logo"
+              src="/Logo.png"
             />
-
-            <h1 className="[font-family:'Alumni_Sans',Helvetica] font-bold text-white text-[22.7px] tracking-[0] leading-[normal] whitespace-nowrap z-10">
-              Open Heavens
-            </h1>
           </header>
 
           <section className="inline-flex flex-col items-center gap-[7.98px] relative flex-[0_0_auto] z-10">
