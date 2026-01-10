@@ -2,6 +2,8 @@ import { Button } from "../../components/ui/button";
 import { CardContent } from "../../components/ui/card";
 import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
+import ReactCrop, { Crop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 
 const steps = [
   {
@@ -22,8 +24,19 @@ const steps = [
 export const SocialMedia = (): JSX.Element => {
   const [uploadedMedia, setUploadedMedia] = useState<string | null>(null);
   const [isVideo, setIsVideo] = useState(false);
+  const [showCrop, setShowCrop] = useState(false);
+  const [tempImage, setTempImage] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Crop>({
+    unit: "px",
+    width: 250,
+    height: 250,
+    x: 0,
+    y: 0,
+  });
+  const [completedCrop, setCompletedCrop] = useState<Crop | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -33,11 +46,78 @@ export const SocialMedia = (): JSX.Element => {
     const isVideoFile = fileType.startsWith("video/");
     setIsVideo(isVideoFile);
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUploadedMedia(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    if (isVideoFile) {
+      // Videos don't need cropping
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedMedia(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // Images need to be checked and possibly cropped
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          if (img.width === 250 && img.height === 250) {
+            // Image is already 250x250, use it directly
+            setUploadedMedia(reader.result as string);
+          } else {
+            // Image needs cropping
+            setTempImage(reader.result as string);
+            setShowCrop(true);
+          }
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = async () => {
+    if (!completedCrop || !imgRef.current || !tempImage) return;
+
+    const canvas = document.createElement("canvas");
+    const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+    
+    // Use original crop dimensions for high quality
+    const cropWidth = completedCrop.width * scaleX;
+    const cropHeight = completedCrop.height * scaleY;
+    
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+    const ctx = canvas.getContext("2d", { alpha: true });
+
+    if (!ctx) return;
+
+    // Disable image smoothing for better quality
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    ctx.drawImage(
+      imgRef.current,
+      completedCrop.x * scaleX,
+      completedCrop.y * scaleY,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      cropWidth,
+      cropHeight
+    );
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setUploadedMedia(reader.result as string);
+          setShowCrop(false);
+          setTempImage(null);
+        };
+        reader.readAsDataURL(blob);
+      }
+    }, "image/png", 1.0);
   };
 
   const handleDownload = async () => {
@@ -49,11 +129,23 @@ export const SocialMedia = (): JSX.Element => {
       
       const cardElement = cardRef.current;
       
+      // Wait for all images to load
+      const images = cardElement.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+      
+      const width = 582;
+      const height = 666;
+      
       // Store original styles
       const originalBorder = cardElement.style.border;
-      const originalOverflow = cardElement.style.overflow;
-      const originalHeight = cardElement.style.height;
-      const originalMaxHeight = cardElement.style.maxHeight;
       const uploadButton = cardElement.querySelector('button');
       const originalButtonDisplay = uploadButton ? (uploadButton as HTMLElement).style.display : '';
       
@@ -63,13 +155,8 @@ export const SocialMedia = (): JSX.Element => {
         (uploadButton as HTMLElement).style.display = 'none';
       }
       
-      // CRITICAL: Remove height constraints and overflow to capture full content
-      cardElement.style.overflow = 'visible';
-      cardElement.style.height = 'auto';
-      cardElement.style.maxHeight = 'none';
-      
       // Give extra time for layout to settle
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Import html2canvas dynamically
       const html2canvas = (await import("html2canvas")).default;
@@ -77,43 +164,19 @@ export const SocialMedia = (): JSX.Element => {
       const canvas = await html2canvas(cardElement, {
         backgroundColor: null,
         scale: 2,
-        logging: false,
+        width: width,
+        height: height,
+        windowWidth: width,
+        windowHeight: height,
+        logging: true,
         useCORS: true,
         allowTaint: true,
-        onclone: (clonedDoc) => {
-          // Fix spacing in the cloned document before capture
-          const styles = `
-            [data-header] {
-              display: flex !important;
-              align-items: center !important;
-              gap: 8px !important;
-            }
-            [data-header] h1 {
-              margin-top: 4px !important;
-            }
-            [data-title] {
-              margin-bottom: 24px !important;
-            }
-            [data-date] {
-              margin-bottom: 24px !important;
-            }
-            [data-footer] {
-              margin-top: 24px !important;
-              padding-bottom: 20px !important;
-            }
-          `;
-          
-          const styleSheet = clonedDoc.createElement('style');
-          styleSheet.textContent = styles;
-          clonedDoc.head.appendChild(styleSheet);
-        },
+        imageTimeout: 15000,
+        removeContainer: true,
       });
 
       // Restore original styles
       cardElement.style.border = originalBorder;
-      cardElement.style.overflow = originalOverflow;
-      cardElement.style.height = originalHeight;
-      cardElement.style.maxHeight = originalMaxHeight;
       if (uploadButton) {
         (uploadButton as HTMLElement).style.display = originalButtonDisplay;
       }
@@ -141,7 +204,51 @@ export const SocialMedia = (): JSX.Element => {
   };
 
   return (
-    <main className="bg-[#02006b] w-full min-h-screen lg:h-screen overflow-auto lg:overflow-hidden relative flex items-center justify-center p-4 md:p-6 lg:p-4">
+    <>
+      {/* Crop Modal */}
+      {showCrop && tempImage && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <h2 className="text-2xl font-bold mb-4 text-black">Crop Your Image to 250x250</h2>
+            <div className="mb-4">
+              <ReactCrop
+                crop={crop}
+                onChange={(c) => setCrop(c)}
+                onComplete={(c) => setCompletedCrop(c)}
+                aspect={1}
+                minWidth={250}
+                minHeight={250}
+              >
+                <img
+                  ref={imgRef}
+                  src={tempImage}
+                  alt="Crop preview"
+                  style={{ maxWidth: "100%" }}
+                />
+              </ReactCrop>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowCrop(false);
+                  setTempImage(null);
+                }}
+                className="bg-gray-500 hover:bg-gray-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCropComplete}
+                className="bg-[#ee0b48] hover:bg-[#ee0b48]/90"
+              >
+                Apply Crop
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="bg-[#02006b] w-full min-h-screen lg:h-screen overflow-auto lg:overflow-hidden relative flex items-center justify-center p-4 md:p-6 lg:p-4">
       <div className="top-[-1321px] left-[-115px] w-[1832px] h-[1833px] bg-[#ee0b48] rounded-[916px/916.5px] absolute blur-[127px] z-0" />
 
       {/* Content Container */}
@@ -209,7 +316,7 @@ export const SocialMedia = (): JSX.Element => {
         {/* Right side - Visible card with border and button */}
         <div 
           ref={cardRef}
-          className="flex flex-col w-full max-w-[500px] lg:max-w-[550px] h-auto min-h-[600px] lg:h-auto lg:max-h-[95vh] items-center justify-between gap-2.5 px-2.5 py-3 lg:py-4 rounded-[20px] overflow-auto border-[8px] lg:border-[11px] border-solid border-white flex-shrink-0 relative z-10"
+          className="flex flex-col w-[582px] h-[666px] items-center justify-center gap-[8.44px] px-[8.44px] py-[16.88px] rounded-[16.88px] overflow-hidden border-[5.06px] border-solid border-white flex-shrink-0 relative z-10"
           style={{
             backgroundImage: 'url(/BG.png)',
             backgroundSize: 'cover',
@@ -217,43 +324,42 @@ export const SocialMedia = (): JSX.Element => {
             backgroundRepeat: 'no-repeat'
           }}
         >
-        <CardContent className="flex flex-col items-center gap-[10px] md:gap-[15px] lg:gap-[10px] relative w-full p-0 z-10" data-card-content>
-          <header className="relative w-auto h-auto z-10 flex items-center gap-1" data-header>
+        <CardContent className="inline-flex flex-col items-center justify-center gap-[15.97px] p-0 relative w-full z-10" data-card-content>
+          <header className="flex items-center gap-1 z-10" data-header>
             <img
-              className="w-[clamp(40px,8vw,51px)] h-[clamp(40px,8vw,51px)] z-10 brightness-0 invert"
+              className="w-[43.04px] h-[43.04px] z-10 brightness-0 invert"
               alt="Layer"
               src="/layer-1.svg"
             />
 
-            <h1 className="[font-family:'Alumni_Sans',Helvetica] font-bold text-white text-[clamp(18px,4vw,26.9px)] tracking-[0] leading-[normal] whitespace-nowrap z-10">
+            <h1 className="[font-family:'Alumni_Sans',Helvetica] font-bold text-white text-[22.7px] tracking-[0] leading-[normal] whitespace-nowrap z-10">
               Open Heavens
             </h1>
           </header>
 
-          <section className="inline-flex flex-col items-center gap-2.5 relative flex-[0_0_auto] z-10">
-            <p className="relative w-full max-w-[466.31px] mt-[-1.00px] [font-family:'Roboto',Helvetica] font-black text-white text-[clamp(14px,3vw,20.8px)] text-center tracking-[0] leading-[normal] z-10">
+          <section className="inline-flex flex-col items-center gap-[7.98px] relative flex-[0_0_auto] z-10">
+            <p className="w-[393.57px] mt-[-1.00px] [font-family:'Roboto',Helvetica] font-black text-white text-[17.6px] text-center tracking-[0] leading-[normal] z-10">
               I will be attending
             </p>
 
-            <div className="relative w-auto z-10 flex flex-col items-center" data-title>
-              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[clamp(42px,10vw,70px)] text-center tracking-[0] leading-[1.08] whitespace-nowrap z-10">
+            <div className="relative w-[247.14px] h-[133.22px] z-10" data-title>
+              <h2 className="absolute top-0 left-0 w-[243px] [font-family:'Fjalla_One',Helvetica] font-normal text-white text-[64.3px] text-center tracking-[0] leading-[69.6px] whitespace-nowrap z-10">
                 POWER AS
               </h2>
-
-              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[clamp(42px,10vw,70px)] text-center tracking-[0] leading-[1.08] whitespace-nowrap z-10">
+              <h2 className="absolute top-[63px] left-11 [font-family:'Fjalla_One',Helvetica] font-normal text-white text-[64.3px] text-center tracking-[0] leading-[69.6px] whitespace-nowrap z-10">
                 OF OLD
               </h2>
             </div>
 
-            <div className="inline-flex flex-col items-center gap-[15px] relative flex-[0_0_auto] z-10">
-              {/* Masked image container with fixed 400px height and border-radius */}
-              <div className="flex w-full max-w-[400px] h-[400px] items-end justify-center relative rounded-[20px] overflow-hidden bg-gray-100 p-5">
+            <div className="inline-flex flex-col items-center gap-[15px] relative flex-[0_0_auto] z-10 mt-6">
+              {/* Image container */}
+              <div className="flex flex-col w-[250px] h-[250px] items-center justify-end gap-[8.44px] p-[16.88px] rounded-[16.88px] overflow-hidden relative bg-gray-100">
                 {uploadedMedia ? (
                   isVideo ? (
                     <video
                       src={uploadedMedia}
                       className="absolute inset-0 w-full h-full"
-                      style={{ objectFit: 'contain' }}
+                      style={{ objectFit: 'cover' }}
                       autoPlay
                       loop
                       muted
@@ -264,14 +370,14 @@ export const SocialMedia = (): JSX.Element => {
                       src={uploadedMedia}
                       alt="Uploaded"
                       className="absolute inset-0 w-full h-full"
-                      style={{ objectFit: 'contain' }}
+                      style={{ objectFit: 'cover' }}
                     />
                   )
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-b from-gray-300 to-gray-400" />
                 )}
                 
-                {/* Upload button positioned over the image */}
+                {/* Upload button positioned at bottom */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -281,40 +387,25 @@ export const SocialMedia = (): JSX.Element => {
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[45px] items-center justify-center px-4 relative w-full max-w-full bg-white rounded-[150px] hover:bg-white/90 z-10"
+                  className="flex h-[51.48px] items-center justify-center gap-[8.44px] p-[8.44px] w-full bg-white rounded-[126.6px] hover:bg-white/90 z-10"
                 >
-                  <span className="[font-family:'Roboto',Helvetica] font-black text-black text-sm">
+                  <span className="[font-family:'Roboto',Helvetica] font-black text-black text-[13.5px] text-center tracking-[0] leading-[normal] whitespace-nowrap">
                     {uploadedMedia ? "Change media" : "Add picture or video"}
                   </span>
                 </Button>
               </div>
             </div>
 
-            <div className="inline-flex flex-col items-center gap-[8px] lg:gap-[5px] relative flex-[0_0_auto] z-10" data-date>
-              <div className="inline-flex flex-col items-start gap-1 lg:gap-0.5 relative flex-[0_0_auto] z-10">
-                <p className="relative w-full max-w-[267.71px] mt-[-1.00px] [font-family:'Roboto',Helvetica] font-black text-white text-[clamp(14px,3vw,21.3px)] text-center tracking-[0] leading-[normal] z-10">
-                  FRI 23 &amp; SAT 24, JAN 2026
-                </p>
-
-                <p className="relative w-full max-w-[267.71px] [font-family:'Roboto',Helvetica] font-bold text-white text-[clamp(12px,2.5vw,17.8px)] text-center tracking-[0] leading-[normal] z-10">
-                  FRI 5PM, SAT 8AM &amp; 5PM
-                </p>
-              </div>
-            </div>
+            <img
+              src="/date.png"
+              alt="Event Date and Location"
+              className="w-[90%] h-auto mt-6"
+            />
           </section>
         </CardContent>
-
-        <footer className="flex flex-col items-center justify-center gap-1 md:gap-2 lg:gap-1 relative w-full flex-[0_0_auto] z-10" data-footer>
-          <h3 className="relative w-full max-w-[346.67px] mt-[-1.00px] [font-family:'Bebas_Neue',Helvetica] font-normal text-white text-[clamp(28px,6vw,44.4px)] text-center tracking-[0] leading-[normal] whitespace-nowrap z-10">
-            the podium lekki
-          </h3>
-
-          <address className="relative w-full max-w-[346.67px] [font-family:'Roboto',Helvetica] font-bold text-white text-[clamp(10px,2vw,14.9px)] text-center tracking-[0] leading-[normal] not-italic z-10">
-            124 T.F.KUBOYE RD, LEKKI, LAGOS.
-          </address>
-        </footer>
       </div>
       </div>
     </main>
+    </>
   );
 };
