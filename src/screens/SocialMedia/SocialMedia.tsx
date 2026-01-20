@@ -323,30 +323,33 @@ export const SocialMedia = (): JSX.Element => {
             backgroundRepeat: 'no-repeat'
           }}
         >
-        <CardContent className="inline-flex flex-col items-center justify-center gap-[15.97px] p-0 relative w-full z-10" data-card-content>
-          <header className="flex items-center justify-center gap-1 z-10" data-header>
+        <CardContent className="inline-flex flex-col items-center justify-center gap-[8px] p-0 relative w-full z-10" data-card-content>
+          <header className="flex items-center justify-between w-full px-6 z-10 mb-2" data-header>
             <img
-              className="w-[60%] h-auto z-10"
-              alt="Open Heavens Logo"
-              src="/Logo.png"
+              className="w-[80px] h-[80px] z-10"
+              alt="Petra Logo"
+              src="/Petralogo.svg"
             />
-          </header>
-
-          <section className="inline-flex flex-col items-center gap-[7.98px] relative flex-[0_0_auto] z-10">
-            <p className="w-[393.57px] mt-[-1.00px] [font-family:'Roboto',Helvetica] font-black text-white text-[17.6px] text-center tracking-[0] leading-[normal] z-10">
-              I will be attending
-            </p>
-
-            <div className="relative w-[247.14px] h-[133.22px] z-10" data-title>
-              <h2 className="absolute top-0 left-0 w-[243px] [font-family:'Fjalla_One',Helvetica] font-normal text-white text-[64.3px] text-center tracking-[0] leading-[69.6px] whitespace-nowrap z-10">
+            <div className="text-right">
+              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[36px] tracking-[0] leading-[1.1] whitespace-nowrap z-10">
                 POWER AS
               </h2>
-              <h2 className="absolute top-[63px] left-11 [font-family:'Fjalla_One',Helvetica] font-normal text-white text-[64.3px] text-center tracking-[0] leading-[69.6px] whitespace-nowrap z-10">
+              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[36px] tracking-[0] leading-[1.1] whitespace-nowrap z-10">
                 OF OLD
               </h2>
             </div>
+          </header>
 
-            <div className="inline-flex flex-col items-center gap-[15px] relative flex-[0_0_auto] z-10 mt-6">
+          <section className="inline-flex flex-col items-center gap-[4px] relative flex-[0_0_auto] z-10">
+            <p className="w-[393.57px] [font-family:'Roboto',Helvetica] font-black text-white text-[17.6px] text-center tracking-[0] leading-[normal] z-10">
+              I will be attending
+            </p>
+
+            <h1 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[72px] text-center tracking-[0] leading-[1.1] z-10 mb-4">
+              OPEN<br />HEAVENS
+            </h1>
+
+            <div className="inline-flex flex-col items-center gap-[15px] relative flex-[0_0_auto] z-10 mt-4">
               {/* Image container */}
               <div className="flex flex-col w-[250px] h-[250px] items-center justify-end gap-[8.44px] p-[16.88px] rounded-[16.88px] overflow-hidden relative bg-gray-100">
                 {uploadedMedia ? (
@@ -394,7 +397,7 @@ export const SocialMedia = (): JSX.Element => {
             <img
               src="/date.png"
               alt="Event Date and Location"
-              className="w-[90%] h-auto mt-6"
+              className="w-[90%] h-auto mt-4"
             />
           </section>
         </CardContent>
