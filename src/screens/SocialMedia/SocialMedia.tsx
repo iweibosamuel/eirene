@@ -164,7 +164,7 @@ export const SocialMedia = (): JSX.Element => {
     if (!uploadedMedia) return null;
 
     // Draw the invite directly on a canvas at 2x the on-screen card size,
-    // mirroring the card layout (pill at 15.5%, photo box at 46%).
+    // mirroring the card layout (pill at 15.5%, photo box at 44%).
     const scale = 2;
     const width = CARD_WIDTH * scale;
     const height = CARD_HEIGHT * scale;
@@ -200,10 +200,10 @@ export const SocialMedia = (): JSX.Element => {
     ctx.fillText(pillText, width / 2, pillY + pillHeight / 2);
 
     // Photo / video, cropped to fill the rounded box
-    const boxWidth = 216 * scale;
-    const boxHeight = 240 * scale;
+    const boxWidth = 252 * scale;
+    const boxHeight = 280 * scale;
     const boxX = (width - boxWidth) / 2;
-    const boxY = height * 0.46;
+    const boxY = height * 0.44;
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
@@ -359,7 +359,7 @@ export const SocialMedia = (): JSX.Element => {
           </div>
 
           {/* Image container */}
-          <div className="absolute top-[46%] left-0 right-0 mx-auto w-[216px] h-[240px] flex flex-col items-center justify-end p-[12px] rounded-[16px] overflow-hidden bg-white/70 z-10">
+          <div className="absolute top-[44%] left-0 right-0 mx-auto w-[252px] h-[280px] flex flex-col items-center justify-end p-[12px] rounded-[16px] overflow-hidden bg-white/70 z-10">
             {uploadedMedia &&
               (isVideo ? (
                 <video
