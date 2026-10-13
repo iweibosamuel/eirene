@@ -1,24 +1,35 @@
 import { Button } from "../../components/ui/button";
-import { CardContent } from "../../components/ui/card";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import ReactCrop, { Crop } from "react-image-crop";
 
-const steps = [
-  {
-    number: "Step 1",
-    title: "Add your photo/ Video",
-  },
-  {
-    number: "Step 2",
-    title:
-      "Download and share on your social media platforms. Use the #Openheavens #powerasofold #petralekki",
-  },
-  {
-    number: "Step 3",
-    title: "Get 10 other people to make this post!",
-  },
-];
+const CARD_WIDTH = 540;
+const CARD_HEIGHT = 675;
+
+const loadImage = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+// Draw a source into the target rect like CSS `background-size: cover`
+const drawCover = (
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) => {
+  const ratio = Math.max(w / sourceWidth, h / sourceHeight);
+  const sw = w / ratio;
+  const sh = h / ratio;
+  ctx.drawImage(source, (sourceWidth - sw) / 2, (sourceHeight - sh) / 2, sw, sh, x, y, w, h);
+};
 
 export const SocialMedia = (): JSX.Element => {
   const [uploadedMedia, setUploadedMedia] = useState<string | null>(null);
@@ -27,7 +38,7 @@ export const SocialMedia = (): JSX.Element => {
   const [tempImage, setTempImage] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>({
     unit: "px",
-    width: 250,
+    width: 225,
     height: 250,
     x: 0,
     y: 0,
@@ -36,6 +47,23 @@ export const SocialMedia = (): JSX.Element => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const [layout, setLayout] = useState({ scale: 1, top: 160 });
+
+  // Scale the card down so it always fits centred on screen
+  useEffect(() => {
+    const update = () => {
+      const top = Math.min(220, Math.max(110, window.innerHeight * 0.18));
+      const scale = Math.min(
+        1,
+        (window.innerWidth - 32) / CARD_WIDTH,
+        (window.innerHeight - top - 100) / CARD_HEIGHT
+      );
+      setLayout({ scale: Math.max(scale, 0.4), top });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -58,8 +86,8 @@ export const SocialMedia = (): JSX.Element => {
       reader.onloadend = () => {
         const img = new Image();
         img.onload = () => {
-          if (img.width === 250 && img.height === 250) {
-            // Image is already 250x250, use it directly
+          if (img.width * 10 === img.height * 9) {
+            // Image already matches the photo box shape, use it directly
             setUploadedMedia(reader.result as string);
           } else {
             // Image needs cropping
@@ -120,65 +148,64 @@ export const SocialMedia = (): JSX.Element => {
   };
 
   const handleDownload = async () => {
-    if (!cardRef.current) return;
+    if (!uploadedMedia) return;
 
     try {
-      // Wait for all fonts to load
-      await document.fonts.ready;
-      
-      const cardElement = cardRef.current;
-      
-      // Wait for all images to load
-      const images = cardElement.querySelectorAll('img');
-      await Promise.all(
-        Array.from(images).map((img) => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        })
-      );
-      
-      const width = 582;
-      const height = 666;
-      
-      // Store original styles
-      const originalBorder = cardElement.style.border;
-      const uploadButton = cardElement.querySelector('button');
-      const originalButtonDisplay = uploadButton ? (uploadButton as HTMLElement).style.display : '';
-      
-      // Temporarily remove border and hide upload button
-      cardElement.style.border = 'none';
-      if (uploadButton) {
-        (uploadButton as HTMLElement).style.display = 'none';
-      }
-      
-      // Give extra time for layout to settle
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Draw the invite directly on a canvas at 2x the on-screen card size,
+      // mirroring the card layout (pill at 15.5%, photo box at 46%).
+      const scale = 2;
+      const width = CARD_WIDTH * scale;
+      const height = CARD_HEIGHT * scale;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
-      // Import html2canvas dynamically
-      const html2canvas = (await import("html2canvas")).default;
-      
-      const canvas = await html2canvas(cardElement, {
-        backgroundColor: null,
-        scale: 2,
-        width: width,
-        height: height,
-        windowWidth: width,
-        windowHeight: height,
-        logging: true,
-        useCORS: true,
-        allowTaint: true,
-        imageTimeout: 15000,
-        removeContainer: true,
-      });
+      await document.fonts.load(`900 ${16 * scale}px Roboto`);
 
-      // Restore original styles
-      cardElement.style.border = originalBorder;
-      if (uploadButton) {
-        (uploadButton as HTMLElement).style.display = originalButtonDisplay;
+      // Background
+      const bg = await loadImage("/BG%202.png");
+      drawCover(ctx, bg, bg.naturalWidth, bg.naturalHeight, 0, 0, width, height);
+
+      // "I will be attending" pill
+      const pillText = "I WILL BE ATTENDING";
+      const pillHeight = 40 * scale;
+      const pillPadding = 20 * scale;
+      ctx.font = `900 ${16 * scale}px Roboto, Helvetica, sans-serif`;
+      const pillWidth = ctx.measureText(pillText).width + pillPadding * 2;
+      const pillX = (width - pillWidth) / 2;
+      const pillY = height * 0.155;
+      ctx.fillStyle = "#e5168a";
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(pillText, width / 2, pillY + pillHeight / 2);
+
+      // Photo / video, cropped to fill the rounded box
+      const boxWidth = 216 * scale;
+      const boxHeight = 240 * scale;
+      const boxX = (width - boxWidth) / 2;
+      const boxY = height * 0.46;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
+      ctx.clip();
+      if (isVideo) {
+        const video = cardRef.current?.querySelector("video");
+        if (video) {
+          drawCover(ctx, video, video.videoWidth, video.videoHeight, boxX, boxY, boxWidth, boxHeight);
+        }
+      } else {
+        const photo = await loadImage(uploadedMedia);
+        drawCover(ctx, photo, photo.naturalWidth, photo.naturalHeight, boxX, boxY, boxWidth, boxHeight);
       }
+      ctx.restore();
 
       canvas.toBlob(
         (blob) => {
@@ -186,7 +213,7 @@ export const SocialMedia = (): JSX.Element => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `open-heavens-invite-${Date.now()}.png`;
+            link.download = `eirene-revive-invite-${Date.now()}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -208,14 +235,14 @@ export const SocialMedia = (): JSX.Element => {
       {showCrop && tempImage && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
-            <h2 className="text-2xl font-bold mb-4 text-black">Crop Your Image to 250x250</h2>
+            <h2 className="text-2xl font-bold mb-4 text-black">Crop Your Image</h2>
             <div className="mb-4">
               <ReactCrop
                 crop={crop}
                 onChange={(c) => setCrop(c)}
                 onComplete={(c) => setCompletedCrop(c)}
-                aspect={1}
-                minWidth={250}
+                aspect={9 / 10}
+                minWidth={225}
                 minHeight={250}
               >
                 <img
@@ -238,7 +265,7 @@ export const SocialMedia = (): JSX.Element => {
               </Button>
               <Button
                 onClick={handleCropComplete}
-                className="bg-[#ee0b48] hover:bg-[#ee0b48]/90"
+                className="bg-[#e5168a] hover:bg-[#e5168a]/90"
               >
                 Apply Crop
               </Button>
@@ -247,163 +274,101 @@ export const SocialMedia = (): JSX.Element => {
         </div>
       )}
 
-      <main className="bg-[#02006b] w-full min-h-screen lg:h-screen overflow-auto lg:overflow-hidden relative flex items-center justify-center p-4 md:p-6 lg:p-4">
-      <div className="top-[-1321px] left-[-115px] w-[1832px] h-[1833px] bg-[#ee0b48] rounded-[916px/916.5px] absolute blur-[127px] z-0" />
-
-      {/* Content Container */}
-      <div className="relative w-full max-w-[1400px] h-auto lg:h-full lg:max-h-screen flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-between gap-6 lg:gap-8 py-4 lg:py-0 pb-24 lg:pb-0 z-10">
-        {/* Left side - Title and Steps */}
-        <div className="flex flex-col gap-4 md:gap-6 lg:gap-4 flex-shrink-0 relative z-10 w-full lg:w-auto items-center lg:items-start">
-          <header className="flex gap-[3.5px] items-center relative z-10 justify-center lg:justify-start">
-            <img
-              className="w-[clamp(50px,8vw,82.79px)] h-[clamp(50px,8vw,82.79px)] relative z-10 brightness-0 invert"
-              alt="Layer"
-              src="/layer-1-1.svg"
-            />
-
-            <h1 className="mt-[17.7px] [font-family:'Alumni_Sans',Helvetica] font-bold text-white text-[clamp(24px,2.5vw,43.6px)] tracking-[0] leading-[normal] whitespace-nowrap relative z-10">
-              Open Heavens
-            </h1>
-          </header>
-
-          <h1 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[clamp(40px,7vw,90px)] tracking-[0] leading-[1.08] relative z-10 text-center lg:text-left">
-            CREATE AN <br />
-            INVITE POST
-          </h1>
-
-          <nav className="hidden md:flex flex-col w-full max-w-[361px] items-start gap-3 lg:gap-2 relative z-10">
-            {steps.map((step, index) => (
-              <div key={index}>
-                <article className="flex items-center justify-center gap-[3.85px] px-0 py-0 relative w-full flex-[0_0_auto] z-10">
-                  <div className="relative flex-1 [font-family:'Bebas_Neue',Helvetica] font-normal text-white text-[clamp(18px,1.5vw,26.5px)] tracking-[0] leading-[normal] z-10">
-                    <span className="[font-family:'Bebas_Neue',Helvetica] font-normal text-white text-[clamp(18px,1.5vw,26.5px)] tracking-[0]">
-                      {step.number}
-                      <br />
-                    </span>
-
-                    <span className="[font-family:'Roboto',Helvetica] font-black text-white text-[clamp(11px,0.9vw,15.4px)]">
-                      {step.title}
-                    </span>
-                  </div>
-                </article>
-
-                {index < steps.length - 1 && (
-                  <img
-                    className="relative w-full h-px"
-                    alt="Vector"
-                    src="/vector-2.svg"
-                  />
-                )}
-              </div>
-            ))}
-          </nav>
-
-          {/* Download button - visible on all screen sizes */}
-          {uploadedMedia && (
-            <Button
-              onClick={handleDownload}
-              className="fixed bottom-4 left-4 right-4 lg:relative lg:bottom-auto lg:left-auto lg:right-auto w-auto max-w-[361px] mx-auto lg:w-full mt-0 lg:mt-8 h-[50px] md:h-[60px] bg-[#ee0b48] hover:bg-[#ee0b48]/90 text-white rounded-[150px] flex items-center justify-center gap-3 z-50"
-            >
-              <Download className="w-5 h-5 md:w-6 md:h-6" />
-              <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
-                Download Your Invite
-              </span>
-            </Button>
-          )}
-        </div>
-
-        {/* Right side - Visible card with border and button */}
-        <div 
+      <main
+        className="w-full min-h-screen overflow-auto relative flex flex-col items-center px-4 pb-24 lg:pb-8"
+        style={{
+          paddingTop: layout.top,
+          backgroundColor: '#ffffff',
+          backgroundImage: 'url("/Artboard 2.png")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        {/* Invite card (wrapper reserves the scaled size so it stays centred) */}
+        <div
+          className="relative flex-shrink-0 z-10"
+          style={{ width: CARD_WIDTH * layout.scale, height: CARD_HEIGHT * layout.scale }}
+        >
+        <div
           ref={cardRef}
-          className="flex flex-col w-[582px] h-[666px] items-center justify-center gap-[8.44px] px-[8.44px] py-[16.88px] rounded-[16.88px] overflow-hidden border-[5.06px] border-solid border-white flex-shrink-0 relative z-10"
+          className="absolute top-0 left-0 w-[540px] h-[675px] rounded-[20px] overflow-hidden shadow-xl"
           style={{
-            backgroundImage: 'url(/BG.png)',
+            transform: `scale(${layout.scale})`,
+            transformOrigin: 'top left',
+            backgroundImage: 'url("/BG 2.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat'
           }}
         >
-        <CardContent className="inline-flex flex-col items-center justify-center gap-[8px] p-0 relative w-full z-10" data-card-content>
-          <header className="flex items-center justify-between w-full px-6 z-10 mb-2" data-header>
-            <img
-              className="w-[80px] h-[80px] z-10"
-              alt="Petra Logo"
-              src="/Petralogo.svg"
-            />
-            <div className="text-right">
-              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[36px] tracking-[0] leading-[1.1] whitespace-nowrap z-10">
-                POWER AS
-              </h2>
-              <h2 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[36px] tracking-[0] leading-[1.1] whitespace-nowrap z-10">
-                OF OLD
-              </h2>
-            </div>
-          </header>
-
-          <section className="inline-flex flex-col items-center gap-[4px] relative flex-[0_0_auto] z-10">
-            <p className="w-[393.57px] [font-family:'Roboto',Helvetica] font-black text-white text-[17.6px] text-center tracking-[0] leading-[normal] z-10">
+          <div className="absolute top-[15.5%] left-0 right-0 flex justify-center z-10">
+            <p className="h-[40px] px-5 flex items-center justify-center rounded-full bg-[#e5168a] [font-family:'Roboto',Helvetica] font-black text-white text-[16px] leading-none uppercase whitespace-nowrap">
               I will be attending
             </p>
+          </div>
 
-            <h1 className="[font-family:'Fjalla_One',Helvetica] font-normal text-white text-[72px] text-center tracking-[0] leading-[1.1] z-10 mb-4">
-              OPEN<br />HEAVENS
-            </h1>
-
-            <div className="inline-flex flex-col items-center gap-[15px] relative flex-[0_0_auto] z-10 mt-4">
-              {/* Image container */}
-              <div className="flex flex-col w-[250px] h-[250px] items-center justify-end gap-[8.44px] p-[16.88px] rounded-[16.88px] overflow-hidden relative bg-gray-100">
-                {uploadedMedia ? (
-                  isVideo ? (
-                    <video
-                      src={uploadedMedia}
-                      className="absolute inset-0 w-full h-full"
-                      style={{ objectFit: 'cover' }}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={uploadedMedia}
-                      alt="Uploaded"
-                      className="absolute inset-0 w-full h-full"
-                      style={{ objectFit: 'cover' }}
-                    />
-                  )
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-b from-gray-300 to-gray-400" />
-                )}
-                
-                {/* Upload button positioned at bottom */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
+          {/* Image container */}
+          <div className="absolute top-[46%] left-0 right-0 mx-auto w-[216px] h-[240px] flex flex-col items-center justify-end p-[12px] rounded-[16px] overflow-hidden bg-white/70 z-10">
+            {uploadedMedia &&
+              (isVideo ? (
+                <video
+                  src={uploadedMedia}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ objectFit: 'cover' }}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
                 />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[51.48px] items-center justify-center gap-[8.44px] p-[8.44px] w-full bg-white rounded-[126.6px] hover:bg-white/90 z-10"
-                >
-                  <span className="[font-family:'Roboto',Helvetica] font-black text-black text-[13.5px] text-center tracking-[0] leading-[normal] whitespace-nowrap">
-                    {uploadedMedia ? "Change media" : "Add picture or video"}
-                  </span>
-                </Button>
-              </div>
-            </div>
+              ) : (
+                <div
+                  role="img"
+                  aria-label="Uploaded"
+                  className="absolute inset-0 w-full h-full"
+                  style={{
+                    backgroundImage: `url(${uploadedMedia})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                />
+              ))}
 
-            <img
-              src="/date.png"
-              alt="Event Date and Location"
-              className="w-[90%] h-auto mt-4"
+            {/* Upload button positioned at bottom */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={handleFileUpload}
+              className="hidden"
             />
-          </section>
-        </CardContent>
-      </div>
-      </div>
-    </main>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-[44px] items-center justify-center p-[8px] w-full bg-white rounded-[126.6px] hover:bg-white/90 z-10 shadow"
+            >
+              <span className="[font-family:'Roboto',Helvetica] font-black text-black text-[13px] text-center whitespace-nowrap">
+                {uploadedMedia ? "Change media" : "Add picture or video here"}
+              </span>
+            </Button>
+          </div>
+        </div>
+        </div>
+
+        {/* Download button */}
+        {uploadedMedia && (
+          <Button
+            onClick={handleDownload}
+            className="fixed bottom-4 left-4 right-4 lg:relative lg:bottom-auto lg:left-auto lg:right-auto w-auto max-w-[361px] mx-auto lg:w-full lg:mt-6 h-[50px] md:h-[60px] bg-[#e5168a] hover:bg-[#e5168a]/90 text-white rounded-[150px] flex items-center justify-center gap-3 z-50"
+          >
+            <Download className="w-5 h-5 md:w-6 md:h-6" />
+            <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
+              Download Your Invite
+            </span>
+          </Button>
+        )}
+      </main>
     </>
   );
 };
