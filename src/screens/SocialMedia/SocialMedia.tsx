@@ -1,6 +1,6 @@
 import { Button } from "../../components/ui/button";
 import { useEffect, useRef, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Share2 } from "lucide-react";
 import ReactCrop, { Crop } from "react-image-crop";
 
 const CARD_WIDTH = 540;
@@ -31,6 +31,17 @@ const drawCover = (
   ctx.drawImage(source, (sourceWidth - sw) / 2, (sourceHeight - sh) / 2, sw, sh, x, y, w, h);
 };
 
+const SHARE_TEXT =
+  "I will be attending REVIVE: A Well Watered Garden! 24th Oct, 10AM at The Petra Place, Lekki. Create your invite: " +
+  window.location.origin;
+
+// Native share sheet with image files (iOS / Android browsers)
+const canShareFiles =
+  typeof navigator !== "undefined" &&
+  !!navigator.canShare?.({
+    files: [new File([""], "invite.png", { type: "image/png" })],
+  });
+
 export const SocialMedia = (): JSX.Element => {
   const [uploadedMedia, setUploadedMedia] = useState<string | null>(null);
   const [isVideo, setIsVideo] = useState(false);
@@ -47,6 +58,7 @@ export const SocialMedia = (): JSX.Element => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const [inviteBlob, setInviteBlob] = useState<Blob | null>(null);
   const [layout, setLayout] = useState({ scale: 1, top: 160 });
 
   // Scale the card down so it always fits centred on screen
@@ -147,87 +159,124 @@ export const SocialMedia = (): JSX.Element => {
     }, "image/png", 1.0);
   };
 
-  const handleDownload = async () => {
-    if (!uploadedMedia) return;
+  // Render the finished invite to a PNG blob
+  const renderInvite = async (): Promise<Blob | null> => {
+    if (!uploadedMedia) return null;
 
-    try {
-      // Draw the invite directly on a canvas at 2x the on-screen card size,
-      // mirroring the card layout (pill at 15.5%, photo box at 46%).
-      const scale = 2;
-      const width = CARD_WIDTH * scale;
-      const height = CARD_HEIGHT * scale;
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
+    // Draw the invite directly on a canvas at 2x the on-screen card size,
+    // mirroring the card layout (pill at 15.5%, photo box at 46%).
+    const scale = 2;
+    const width = CARD_WIDTH * scale;
+    const height = CARD_HEIGHT * scale;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-      await document.fonts.load(`900 ${16 * scale}px Roboto`);
+    await document.fonts.load(`900 ${16 * scale}px Roboto`);
 
-      // Background
-      const bg = await loadImage("/BG%202.png");
-      drawCover(ctx, bg, bg.naturalWidth, bg.naturalHeight, 0, 0, width, height);
+    // Background
+    const bg = await loadImage("/invite-bg.jpg");
+    drawCover(ctx, bg, bg.naturalWidth, bg.naturalHeight, 0, 0, width, height);
 
-      // "I will be attending" pill
-      const pillText = "I WILL BE ATTENDING";
-      const pillHeight = 40 * scale;
-      const pillPadding = 20 * scale;
-      ctx.font = `900 ${16 * scale}px Roboto, Helvetica, sans-serif`;
-      const pillWidth = ctx.measureText(pillText).width + pillPadding * 2;
-      const pillX = (width - pillWidth) / 2;
-      const pillY = height * 0.155;
-      ctx.fillStyle = "#e5168a";
-      ctx.beginPath();
-      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(pillText, width / 2, pillY + pillHeight / 2);
+    // "I will be attending" pill
+    const pillText = "I WILL BE ATTENDING";
+    const pillHeight = 40 * scale;
+    const pillPadding = 20 * scale;
+    ctx.font = `900 ${16 * scale}px Roboto, Helvetica, sans-serif`;
+    const pillWidth = ctx.measureText(pillText).width + pillPadding * 2;
+    const pillX = (width - pillWidth) / 2;
+    const pillY = height * 0.155;
+    ctx.fillStyle = "#e5168a";
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(pillText, width / 2, pillY + pillHeight / 2);
 
-      // Photo / video, cropped to fill the rounded box
-      const boxWidth = 216 * scale;
-      const boxHeight = 240 * scale;
-      const boxX = (width - boxWidth) / 2;
-      const boxY = height * 0.46;
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
-      ctx.clip();
-      if (isVideo) {
-        const video = cardRef.current?.querySelector("video");
-        if (video) {
-          drawCover(ctx, video, video.videoWidth, video.videoHeight, boxX, boxY, boxWidth, boxHeight);
-        }
-      } else {
-        const photo = await loadImage(uploadedMedia);
-        drawCover(ctx, photo, photo.naturalWidth, photo.naturalHeight, boxX, boxY, boxWidth, boxHeight);
+    // Photo / video, cropped to fill the rounded box
+    const boxWidth = 216 * scale;
+    const boxHeight = 240 * scale;
+    const boxX = (width - boxWidth) / 2;
+    const boxY = height * 0.46;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
+    ctx.clip();
+    if (isVideo) {
+      const video = cardRef.current?.querySelector("video");
+      if (video) {
+        drawCover(ctx, video, video.videoWidth, video.videoHeight, boxX, boxY, boxWidth, boxHeight);
       }
-      ctx.restore();
+    } else {
+      const photo = await loadImage(uploadedMedia);
+      drawCover(ctx, photo, photo.naturalWidth, photo.naturalHeight, boxX, boxY, boxWidth, boxHeight);
+    }
+    ctx.restore();
 
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `eirene-revive-invite-${Date.now()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-          }
-        },
-        "image/png",
-        1.0
-      );
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
+  };
+
+  // Pre-render photo invites so sharing can open the share sheet instantly
+  // (iOS rejects navigator.share if too much time passes after the tap).
+  useEffect(() => {
+    setInviteBlob(null);
+    if (!uploadedMedia || isVideo) return;
+    let cancelled = false;
+    renderInvite()
+      .then((blob) => {
+        if (!cancelled) setInviteBlob(blob);
+      })
+      .catch((error) => console.error("Error pre-rendering invite:", error));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedMedia, isVideo]);
+
+  const getInvite = async () => inviteBlob ?? (await renderInvite());
+
+  const saveBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `eirene-revive-invite-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownload = async () => {
+    try {
+      const blob = await getInvite();
+      if (blob) saveBlob(blob);
     } catch (error) {
       console.error("Error generating image:", error);
       alert("Failed to generate image. Please try again.");
     }
   };
+
+  const handleShare = async () => {
+    try {
+      const blob = await getInvite();
+      if (!blob) return;
+      const file = new File([blob], "eirene-revive-invite.png", { type: "image/png" });
+
+      // Native iOS / Android share sheet (WhatsApp, Instagram, TikTok, ...)
+      await navigator.share({ files: [file], text: SHARE_TEXT });
+    } catch (error) {
+      if ((error as DOMException).name === "AbortError") return; // user closed the sheet
+      console.error("Error sharing image:", error);
+      alert("Sharing failed. Please download your invite and share it instead.");
+    }
+  };
+
 
   return (
     <>
@@ -279,7 +328,7 @@ export const SocialMedia = (): JSX.Element => {
         style={{
           paddingTop: layout.top,
           backgroundColor: '#ffffff',
-          backgroundImage: 'url("/Artboard 2.png")',
+          backgroundImage: 'url("/artboard.jpg")',
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
           backgroundRepeat: 'no-repeat',
@@ -297,7 +346,7 @@ export const SocialMedia = (): JSX.Element => {
           style={{
             transform: `scale(${layout.scale})`,
             transformOrigin: 'top left',
-            backgroundImage: 'url("/BG 2.png")',
+            backgroundImage: 'url("/invite-bg.jpg")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat'
@@ -356,18 +405,33 @@ export const SocialMedia = (): JSX.Element => {
         </div>
         </div>
 
-        {/* Download button */}
+        {/* Share & download buttons */}
         {uploadedMedia && (
-          <Button
-            onClick={handleDownload}
-            className="fixed bottom-4 left-4 right-4 lg:relative lg:bottom-auto lg:left-auto lg:right-auto w-auto max-w-[361px] mx-auto lg:w-full lg:mt-6 h-[50px] md:h-[60px] bg-[#e5168a] hover:bg-[#e5168a]/90 text-white rounded-[150px] flex items-center justify-center gap-3 z-50"
-          >
-            <Download className="w-5 h-5 md:w-6 md:h-6" />
-            <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
-              Download Your Invite
-            </span>
-          </Button>
+          <div className="fixed bottom-4 left-4 right-4 lg:relative lg:bottom-auto lg:left-auto lg:right-auto max-w-[440px] mx-auto lg:w-full lg:mt-6 flex gap-3 z-50">
+            {canShareFiles && (
+            <Button
+              onClick={handleShare}
+              className="flex-1 h-[50px] md:h-[60px] bg-[#e5168a] hover:bg-[#e5168a]/90 text-white rounded-[150px] flex items-center justify-center gap-2"
+            >
+              <Share2 className="w-5 h-5 md:w-6 md:h-6" />
+              <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
+                Share
+              </span>
+            </Button>
+            )}
+            <Button
+              onClick={handleDownload}
+              className="flex-1 h-[50px] md:h-[60px] bg-white hover:bg-white/90 text-[#e5168a] border-2 border-[#e5168a] rounded-[150px] flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5 md:w-6 md:h-6" />
+              <span className="[font-family:'Roboto',Helvetica] font-black text-base md:text-lg">
+                Download
+              </span>
+            </Button>
+          </div>
         )}
+
+
       </main>
     </>
   );
